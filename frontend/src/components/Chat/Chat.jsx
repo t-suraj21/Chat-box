@@ -28,7 +28,7 @@ const Chat = () => {
     const parsedUser = JSON.parse(userData)
     setUser(parsedUser)
 
-    const socketInstance = io('http://localhost:8001', {
+    const socketInstance = io('https://chat-box-o6vn.onrender.com', {
       auth: { token }
     })
 
@@ -67,7 +67,7 @@ const Chat = () => {
   const fetchFriend = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`http://localhost:8001/api/users/${friendId}`, {
+      const response = await axios.get(`https://chat-box-o6vn.onrender.com/api/users/${friendId}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setFriend(response.data)
@@ -79,7 +79,7 @@ const Chat = () => {
   const fetchMessages = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`http://localhost:8001/api/messages/${friendId}`, {
+      const response = await axios.get(`https://chat-box-o6vn.onrender.com/messages/${friendId}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setMessages(response.data)
@@ -103,7 +103,7 @@ const Chat = () => {
 
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.post('http://localhost:8001/api/messages', messageData, {
+      const response = await axios.post('https://chat-box-o6vn.onrender.com/api/messages', messageData, {
         headers: { Authorization: `Bearer ${token}` }
       })
 

@@ -49,7 +49,7 @@ const Profile = () => {
 
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.put('http://localhost:8001/api/users/profile', formData, {
+      const response = await axios.put('https://chat-box-o6vn.onrender.com/api/users/profile', formData, {
         headers: { Authorization: `Bearer ${token}` }
       })
       

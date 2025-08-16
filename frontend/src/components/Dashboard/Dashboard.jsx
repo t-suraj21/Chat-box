@@ -27,7 +27,7 @@ const Dashboard = () => {
   const fetchFriends = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get('http://localhost:8001/api/friends', {
+      const response = await axios.get('https://chat-box-o6vn.onrender.com/api/friends', {
         headers: { Authorization: `Bearer ${token}` }
       })
       setFriends(response.data)
@@ -39,7 +39,7 @@ const Dashboard = () => {
   const fetchFriendRequests = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get('http://localhost:8001/api/friends/requests', {
+      const response = await axios.get('https://chat-box-o6vn.onrender.com/api/friends/requests', {
         headers: { Authorization: `Bearer ${token}` }
       })
       setFriendRequests(response.data)
@@ -134,7 +134,7 @@ const Dashboard = () => {
                             try {
                               const token = localStorage.getItem('token')
                               await axios.put(
-                                `http://localhost:8001/api/friends/requests/${request._id}/accept`,
+                                `https://chat-box-o6vn.onrender.com/api/friends/requests/${request._id}/accept`,
                                 {},
                                 { headers: { Authorization: `Bearer ${token}` }}
                               )
@@ -153,7 +153,7 @@ const Dashboard = () => {
                             try {
                               const token = localStorage.getItem('token')
                               await axios.put(
-                                `http://localhost:8001/api/friends/requests/${request._id}/reject`,
+                                `https://chat-box-o6vn.onrender.com/api/friends/requests/${request._id}/reject`,
                                 {},
                                 { headers: { Authorization: `Bearer ${token}` }}
                               )

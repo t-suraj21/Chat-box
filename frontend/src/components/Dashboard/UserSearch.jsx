@@ -17,7 +17,7 @@ const UserSearch = ({ onRefreshRequests }) => {
     try {
       const token = localStorage.getItem('token')
       const response = await axios.get(
-        `http://localhost:8001/api/users/search?q=${encodeURIComponent(searchQuery)}`,
+        `https://chat-box-o6vn.onrender.com/api/users/search?q=${encodeURIComponent(searchQuery)}`,
         { headers: { Authorization: `Bearer ${token}` }}
       )
       setSearchResults(response.data)
@@ -32,7 +32,7 @@ const UserSearch = ({ onRefreshRequests }) => {
     try {
       const token = localStorage.getItem('token')
       await axios.post(
-        'http://localhost:8001/api/friends/request',
+        'https://chat-box-o6vn.onrender.com/api/friends/request',
         { to: userId },
         { headers: { Authorization: `Bearer ${token}` }}
       )
