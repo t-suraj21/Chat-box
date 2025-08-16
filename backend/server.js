@@ -1,0 +1,77 @@
+import express from 'express'
+import cors from 'cors'
+import dotenv from 'dotenv'
+import { createServer } from 'http'
+import { Server } from 'socket.io'
+import connectDB from './config/db.js'
+import authRoutes from './routes/auth.js'
+import userRoutes from './routes/users.js'
+import friendRoutes from './routes/friends.js'
+import messageRoutes from './routes/messages.js'
+import { authenticateSocket } from './middleware/auth.js'
+
+dotenv.config()
+
+const app = express()
+const server = createServer(app)
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
+})
+
+connectDB()
+
+app.use(cors())
+app.use(express.json())
+
+app.use('/api/auth', authRoutes)
+app.use('/api/users', userRoutes)
+app.use('/api/friends', friendRoutes)
+app.use('/api/messages', messageRoutes)
+
+const connectedUsers = new Map()
+
+io.use(authenticateSocket)
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.user.username)
+  
+  connectedUsers.set(socket.user._id.toString(), socket.id)
+  
+  socket.broadcast.emit('user-online', socket.user._id)
+
+  socket.on('join-chat', (friendId) => {
+    const chatId = [socket.user._id.toString(), friendId].sort().join('-')
+    socket.join(chatId)
+    console.log(`${socket.user.username} joined chat: ${chatId}`)
+  })
+
+  socket.on('send-message', (message) => {
+    const chatId = [message.from._id, message.to._id].sort().join('-')
+    socket.to(chatId).emit('message', message)
+  })
+
+  socket.on('typing', (data) => {
+    const chatId = [socket.user._id.toString(), data.chatId].sort().join('-')
+    socket.to(chatId).emit('typing', { userId: socket.user._id })
+  })
+
+  socket.on('stop-typing', (data) => {
+    const chatId = [socket.user._id.toString(), data.chatId].sort().join('-')
+    socket.to(chatId).emit('stop-typing', { userId: socket.user._id })
+  })
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.user.username)
+    connectedUsers.delete(socket.user._id.toString())
+    socket.broadcast.emit('user-offline', socket.user._id)
+  })
+})
+
+const PORT = process.env.PORT || 5000
+
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
