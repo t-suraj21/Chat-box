@@ -14,6 +14,10 @@ const Profile = () => {
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [previewAvatar, setPreviewAvatar] = useState('')
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -104,6 +108,52 @@ const Profile = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     navigate('/login')
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword.trim()) {
+      setDeleteError('Password is required')
+      return
+    }
+
+    setDeleteLoading(true)
+    setDeleteError('')
+
+    try {
+      const token = localStorage.getItem('token')
+      await axios.delete('https://chat-box-o6vn.onrender.com/api/users/account', {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { password: deletePassword }
+      })
+
+      // Clear all local storage
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      
+      // Navigate to login with success message
+      navigate('/login', { 
+        state: { 
+          message: 'Account deleted successfully. You can create a new account with the same email.' 
+        } 
+      })
+
+    } catch (err) {
+      setDeleteError(err.response?.data?.message || 'Failed to delete account')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const openDeleteDialog = () => {
+    setShowDeleteDialog(true)
+    setDeleteError('')
+    setDeletePassword('')
+  }
+
+  const closeDeleteDialog = () => {
+    setShowDeleteDialog(false)
+    setDeleteError('')
+    setDeletePassword('')
   }
 
   if (!user) {
@@ -328,6 +378,105 @@ const Profile = () => {
             </div>
           </form>
         </div>
+
+        {/* Delete Account Section */}
+        <div className="bg-red-50/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-red-200/20">
+          <div className="flex items-center mb-4">
+            <svg className="w-6 h-6 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <h2 className="text-xl font-bold text-red-800">Danger Zone</h2>
+          </div>
+          
+          <div className="bg-white/70 rounded-lg p-4 border border-red-200">
+            <h3 className="text-lg font-semibold text-red-700 mb-2">Delete Account</h3>
+            <p className="text-red-600 text-sm mb-4">
+              Permanently delete your account and all associated data. This action cannot be undone. 
+              After deletion, you can create a new account using the same email address.
+            </p>
+            <button
+              onClick={openDeleteDialog}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-red-300"
+            >
+              Delete My Account
+            </button>
+          </div>
+        </div>
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+              <div className="text-center mb-6">
+                <svg className="w-16 h-16 text-red-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Delete Account?</h3>
+                <p className="text-gray-600 text-sm">
+                  This will permanently delete your account, all messages, friendships, and data. 
+                  This action cannot be undone.
+                </p>
+              </div>
+
+              {deleteError && (
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md mb-4">
+                  <div className="flex">
+                    <svg className="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-red-700 text-sm font-medium">{deleteError}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Enter your password to confirm:
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all duration-200"
+                    placeholder="Enter your password"
+                    onKeyDown={(e) => e.key === 'Enter' && handleDeleteAccount()}
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 0h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="flex space-x-4">
+                <button
+                  onClick={closeDeleteDialog}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all duration-200"
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteLoading || !deletePassword.trim()}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleteLoading ? (
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </div>
+                  ) : (
+                    'Delete Forever'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

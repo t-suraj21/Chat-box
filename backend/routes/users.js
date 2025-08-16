@@ -2,6 +2,7 @@ import express from 'express'
 import User from '../models/User.js'
 import FriendRequest from '../models/FriendRequest.js'
 import Friendship from '../models/Friendship.js'
+import Message from '../models/Message.js'
 import { authenticate } from '../middleware/auth.js'
 
 const router = express.Router()
@@ -129,6 +130,64 @@ router.put('/profile', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error)
     res.status(500).json({ message: 'Server error' })
+  }
+})
+
+// Delete account endpoint
+router.delete('/account', authenticate, async (req, res) => {
+  try {
+    const { password } = req.body
+    const userId = req.user._id
+
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required to delete account' })
+    }
+
+    // Verify password before deletion
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    const isPasswordValid = await user.comparePassword(password)
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: 'Invalid password' })
+    }
+
+    // Start cleanup process - delete all related data
+    console.log(`Starting account deletion for user: ${user.username} (${user.email})`)
+
+    // Delete all messages sent by this user
+    await Message.deleteMany({ from: userId })
+    console.log('Deleted messages sent by user')
+
+    // Delete all messages sent to this user
+    await Message.deleteMany({ to: userId })
+    console.log('Deleted messages sent to user')
+
+    // Delete all friend requests involving this user
+    await FriendRequest.deleteMany({
+      $or: [{ from: userId }, { to: userId }]
+    })
+    console.log('Deleted friend requests')
+
+    // Delete all friendships involving this user
+    await Friendship.deleteMany({
+      users: userId
+    })
+    console.log('Deleted friendships')
+
+    // Finally, delete the user account
+    await User.findByIdAndDelete(userId)
+    console.log('Deleted user account')
+
+    res.json({ 
+      message: 'Account deleted successfully. You can now create a new account with the same email.' 
+    })
+
+  } catch (error) {
+    console.error('Delete account error:', error)
+    res.status(500).json({ message: 'Server error occurred while deleting account' })
   }
 })
 

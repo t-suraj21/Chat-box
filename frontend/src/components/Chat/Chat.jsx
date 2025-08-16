@@ -16,6 +16,7 @@ const Chat = () => {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [connected, setConnected] = useState(false)
   const messagesEndRef = useRef(null)
   const typingTimeoutRef = useRef(null)
   const messageInputRef = useRef(null)
@@ -31,48 +32,115 @@ const Chat = () => {
 
     const parsedUser = JSON.parse(userData)
     setUser(parsedUser)
-    initializeChat(token, parsedUser)
-  }, [friendId, navigate])
 
-  const initializeChat = async (token, userData) => {
-    try {
-      setLoading(true)
-      
-      const socketInstance = io('https://chat-box-o6vn.onrender.com', {
-        auth: { token }
-      })
+    const initializeChat = async () => {
+      try {
+        setLoading(true)
+        
+        // Create socket connection
+        const socketInstance = io('https://chat-box-o6vn.onrender.com', {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionAttempts: 5,
+          timeout: 20000
+        })
 
-      setSocket(socketInstance)
-      socketInstance.emit('join-chat', friendId)
+        setSocket(socketInstance)
 
-      socketInstance.on('message', (message) => {
-        setMessages(prev => [...prev, message])
-      })
+        // Set up socket event listeners
+        socketInstance.on('connect', () => {
+          console.log('Socket connected:', socketInstance.id)
+          setConnected(true)
+          setError('')
+          socketInstance.emit('join-chat', friendId)
+        })
 
-      socketInstance.on('typing', (data) => {
-        if (data.userId !== userData._id) {
-          setFriendTyping(true)
-        }
-      })
+        socketInstance.on('disconnect', (reason) => {
+          console.log('Socket disconnected:', reason)
+          setConnected(false)
+          if (reason === 'io server disconnect') {
+            // Server disconnected, need to reconnect manually
+            socketInstance.connect()
+          }
+        })
 
-      socketInstance.on('stop-typing', (data) => {
-        if (data.userId !== userData._id) {
-          setFriendTyping(false)
-        }
-      })
+        socketInstance.on('reconnect', () => {
+          console.log('Socket reconnected')
+          setConnected(true)
+          setError('')
+          socketInstance.emit('join-chat', friendId)
+        })
 
-      await Promise.all([fetchFriend(token), fetchMessages(token)])
-      setLoading(false)
+        socketInstance.on('reconnect_error', (error) => {
+          console.error('Reconnection failed:', error)
+          setError('Connection lost. Trying to reconnect...')
+        })
 
-      return () => {
-        socketInstance.disconnect()
+        socketInstance.on('message', (message) => {
+          console.log('Received message:', message)
+          setMessages(prev => {
+            // Prevent duplicate messages
+            const exists = prev.some(msg => msg._id === message._id)
+            if (exists) return prev
+            return [...prev, message]
+          })
+        })
+
+        socketInstance.on('typing', (data) => {
+          console.log('User typing:', data)
+          if (data.userId !== parsedUser._id) {
+            setFriendTyping(true)
+          }
+        })
+
+        socketInstance.on('stop-typing', (data) => {
+          console.log('User stopped typing:', data)
+          if (data.userId !== parsedUser._id) {
+            setFriendTyping(false)
+          }
+        })
+
+        socketInstance.on('error', (error) => {
+          console.error('Socket error:', error)
+          setError('Connection error occurred')
+        })
+
+        // Fetch initial data
+        await Promise.all([fetchFriend(token), fetchMessages(token)])
+        setLoading(false)
+
+      } catch (err) {
+        console.error('Error initializing chat:', err)
+        setError('Failed to initialize chat')
+        setLoading(false)
       }
-    } catch (err) {
-      console.error('Error initializing chat:', err)
-      setError('Failed to initialize chat')
-      setLoading(false)
     }
-  }
+
+    initializeChat()
+
+    // Cleanup function
+    return () => {
+      if (socket) {
+        console.log('Cleaning up socket connection')
+        socket.off('connect')
+        socket.off('disconnect')
+        socket.off('reconnect')
+        socket.off('reconnect_error')
+        socket.off('message')
+        socket.off('typing')
+        socket.off('stop-typing')
+        socket.off('error')
+        socket.disconnect()
+        setSocket(null)
+        setConnected(false)
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+    }
+  }, [friendId, navigate]) // Only depend on friendId and navigate
 
   useEffect(() => {
     scrollToBottom()
@@ -108,31 +176,49 @@ const Chat = () => {
 
   const sendMessage = async (e) => {
     e.preventDefault()
-    if (!newMessage.trim() || !socket || sending) return
+    if (!newMessage.trim() || !socket || sending || !connected) return
 
+    const messageContent = newMessage.trim()
     setSending(true)
+    setNewMessage('') // Clear input immediately for better UX
+    
+    // Stop typing immediately
+    if (typing) {
+      socket.emit('stop-typing', { chatId: friendId })
+      setTyping(false)
+    }
+
     const messageData = {
       to: friendId,
-      content: newMessage.trim()
+      content: messageContent
     }
 
     try {
       const token = localStorage.getItem('token')
+      console.log('Sending message:', messageData)
+      
       const response = await axios.post('https://chat-box-o6vn.onrender.com/api/messages', messageData, {
         headers: { Authorization: `Bearer ${token}` }
       })
 
+      console.log('Message sent successfully:', response.data)
+
+      // Emit the message through socket for real-time delivery
       socket.emit('send-message', response.data)
-      setMessages(prev => [...prev, response.data])
-      setNewMessage('')
       
-      if (typing) {
-        socket.emit('stop-typing', { chatId: friendId })
-        setTyping(false)
-      }
+      // Add message to local state immediately (optimistic update)
+      setMessages(prev => {
+        // Check if message already exists to prevent duplicates
+        const exists = prev.some(msg => msg._id === response.data._id)
+        if (exists) return prev
+        return [...prev, response.data]
+      })
+
     } catch (err) {
       console.error('Error sending message:', err)
       setError('Failed to send message')
+      // Restore message on error
+      setNewMessage(messageContent)
     } finally {
       setSending(false)
     }
@@ -249,12 +335,25 @@ const Chat = () => {
                 <h1 className="text-lg sm:text-xl font-bold text-gray-900">
                   {friend.username}
                 </h1>
-                <p className="text-sm text-gray-600 flex items-center">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${
-                    friend.isOnline ? 'bg-green-400' : 'bg-gray-400'
-                  }`}></div>
-                  {friend.isOnline ? 'Online' : 'Offline'}
-                </p>
+                <div className="flex items-center space-x-4">
+                  <p className="text-sm text-gray-600 flex items-center">
+                    <div className={`w-2 h-2 rounded-full mr-2 ${
+                      friend.isOnline ? 'bg-green-400' : 'bg-gray-400'
+                    }`}></div>
+                    {friend.isOnline ? 'Online' : 'Offline'}
+                  </p>
+                  {/* Connection Status */}
+                  <div className="flex items-center space-x-1">
+                    <div className={`w-2 h-2 rounded-full ${
+                      connected ? 'bg-green-500' : 'bg-red-500'
+                    } ${!connected ? 'animate-pulse' : ''}`}></div>
+                    <span className={`text-xs ${
+                      connected ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {connected ? 'Connected' : 'Connecting...'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -398,7 +497,7 @@ const Chat = () => {
           
           <button
             type="submit"
-            disabled={!newMessage.trim() || sending}
+            disabled={!newMessage.trim() || sending || !connected}
             className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 active:scale-95"
           >
             {sending ? (
