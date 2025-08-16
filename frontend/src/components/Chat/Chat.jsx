@@ -79,7 +79,7 @@ const Chat = () => {
   const fetchMessages = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`https://chat-box-o6vn.onrender.com/messages/${friendId}`, {
+      const response = await axios.get(`https://chat-box-o6vn.onrender.com/api/messages/${friendId}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setMessages(response.data)
