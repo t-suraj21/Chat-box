@@ -30,6 +30,9 @@ connectDB()
 app.use(cors())
 app.use(express.json())
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/friends', friendRoutes)
@@ -55,6 +58,13 @@ io.on('connection', (socket) => {
   socket.on('send-message', (message) => {
     const chatId = [message.from._id, message.to._id].sort().join('-')
     socket.to(chatId).emit('message', message)
+  })
+
+  socket.on('message-reaction', (data) => {
+    const { messageId, emoji, userId } = data
+    const targetUserId = userId === socket.user._id.toString() ? data.targetUserId : socket.user._id.toString()
+    const chatId = [socket.user._id.toString(), targetUserId].sort().join('-')
+    socket.to(chatId).emit('message-reaction', { messageId, emoji, userId })
   })
 
   socket.on('typing', (data) => {

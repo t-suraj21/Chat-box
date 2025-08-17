@@ -35,7 +35,34 @@ const messageSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  editedAt: Date
+  editedAt: Date,
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
+  },
+  reactions: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    emoji: {
+      type: String,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  status: {
+    type: String,
+    enum: ['sent', 'delivered', 'read'],
+    default: 'sent'
+  },
+  fileName: String,
+  fileUrl: String,
+  fileSize: Number
 }, {
   timestamps: true
 })
