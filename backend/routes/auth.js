@@ -1,9 +1,7 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
-import OTP from '../models/OTP.js'
 import { authenticate } from '../middleware/auth.js'
-import { generateOTP, sendOTPEmail, sendWelcomeEmail } from '../utils/emailService.js'
 
 const router = express.Router()
 
@@ -11,56 +9,11 @@ const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '90d' })
 }
 
-// Step 1: Send OTP to email for registration
-router.post('/send-otp', async (req, res) => {
-  try {
-    const { email } = req.body
-
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required' })
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email })
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email already exists' })
-    }
-
-    // Delete any existing OTPs for this email
-    await OTP.deleteMany({ email })
-
-    // Generate and save new OTP
-    const otp = generateOTP()
-    const otpDoc = new OTP({
-      email,
-      otp
-    })
-    await otpDoc.save()
-
-    // Send OTP email
-    const emailResult = await sendOTPEmail(email, otp)
-    
-    if (!emailResult.success) {
-      return res.status(500).json({ message: 'Failed to send OTP email' })
-    }
-
-    res.json({
-      message: 'OTP sent successfully to your email',
-      success: true
-    })
-
-  } catch (error) {
-    console.error('Send OTP error:', error)
-    res.status(500).json({ message: 'Server error' })
-  }
-})
-
-// Step 2: Verify OTP and complete registration
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, otp } = req.body
+    const { username, email, password } = req.body
 
-    if (!username || !email || !password || !otp) {
+    if (!username || !email || !password) {
       return res.status(400).json({ message: 'All fields are required' })
     }
 
@@ -68,18 +21,6 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 6 characters' })
     }
 
-    // Verify OTP
-    const otpDoc = await OTP.findOne({ 
-      email, 
-      otp, 
-      isUsed: false 
-    }).sort({ createdAt: -1 })
-
-    if (!otpDoc) {
-      return res.status(400).json({ message: 'Invalid or expired OTP' })
-    }
-
-    // Check if user already exists (double check)
     const existingUser = await User.findOne({
       $or: [{ email }, { username }]
     })
@@ -90,22 +31,13 @@ router.post('/register', async (req, res) => {
       })
     }
 
-    // Mark OTP as used
-    otpDoc.isUsed = true
-    await otpDoc.save()
-
-    // Create user with verified email
     const user = new User({
       username,
       email,
-      password,
-      isEmailVerified: true
+      password
     })
 
     await user.save()
-
-    // Send welcome email
-    await sendWelcomeEmail(email, username)
 
     const token = generateToken(user._id)
 
@@ -133,10 +65,6 @@ router.post('/login', async (req, res) => {
     
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' })
-    }
-
-    if (!user.isEmailVerified) {
-      return res.status(401).json({ message: 'Please verify your email before logging in' })
     }
 
     const isPasswordValid = await user.comparePassword(password)
