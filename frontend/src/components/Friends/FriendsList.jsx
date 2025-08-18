@@ -58,7 +58,9 @@ const FriendsList = ({ friends, onStartChat }) => {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-600 truncate">{friend.email}</p>
+                  <p className="text-sm text-gray-500 truncate">
+                    {friend.isOnline ? 'Active now' : `Last seen ${new Date(friend.lastSeen).toLocaleDateString()}`}
+                  </p>
                   {friend.bio && (
                     <p className="text-sm text-gray-500 truncate mt-1">{friend.bio}</p>
                   )}

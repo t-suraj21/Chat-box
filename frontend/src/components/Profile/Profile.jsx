@@ -20,6 +20,7 @@ const Profile = () => {
   const [deleteError, setDeleteError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [friends, setFriends] = useState([])
+  const [recentMessages, setRecentMessages] = useState([])
   const [stats, setStats] = useState({ friends: 0, messages: 0 })
   const navigate = useNavigate()
 
@@ -50,16 +51,23 @@ const Profile = () => {
     try {
       const token = localStorage.getItem('token')
       
-      // Fetch friends
-      const friendsResponse = await axios.get('https://chat-box-o6vn.onrender.com/api/friends', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      // Fetch friends and recent messages in parallel
+      const [friendsResponse, messagesResponse] = await Promise.all([
+        axios.get('https://chat-box-o6vn.onrender.com/api/friends', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get('https://chat-box-o6vn.onrender.com/api/messages/recent/profile?limit=5', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ])
+      
       setFriends(friendsResponse.data.slice(0, 6)) // Show only first 6 friends
+      setRecentMessages(messagesResponse.data)
       
       // Set stats
       setStats({
         friends: friendsResponse.data.length,
-        messages: Math.floor(Math.random() * 1000) + 50 // Placeholder for message count
+        messages: messagesResponse.data.length
       })
     } catch (err) {
       console.error('Failed to fetch profile data:', err)
@@ -335,6 +343,85 @@ const Profile = () => {
                     )}
                   </div>
                   <p className="text-xs text-gray-600 truncate">{friend.username}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent Messages Section */}
+        {recentMessages.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center">
+                <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Recent Messages
+              </h2>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="text-blue-500 hover:text-blue-600 text-sm font-medium"
+              >
+                View all
+              </button>
+            </div>
+            <div className="space-y-3">
+              {recentMessages.map((message) => (
+                <div key={message._id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex-shrink-0">
+                    {message.from.avatar ? (
+                      <img
+                        src={message.from.avatar}
+                        alt={message.from.username}
+                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-gradient-to-r from-gray-400 to-gray-600 rounded-full flex items-center justify-center border-2 border-gray-200">
+                        <span className="text-white font-semibold text-sm">
+                          {message.from.username.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {message.from.username}
+                      </p>
+                      <span className="text-xs text-gray-500">
+                        {new Date(message.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 truncate">
+                      {message.messageType === 'image' ? (
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Sent a photo
+                        </span>
+                      ) : message.messageType === 'file' ? (
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Sent a file
+                        </span>
+                      ) : (
+                        message.content
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/chat/${message.from._id}`)}
+                    className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                    title="Reply"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>

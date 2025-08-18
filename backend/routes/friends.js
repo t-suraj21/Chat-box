@@ -69,9 +69,15 @@ router.get('/requests', authenticate, async (req, res) => {
     const friendRequests = await FriendRequest.find({
       to: userId,
       status: 'pending'
-    }).populate('from', '-password').sort({ createdAt: -1 })
+    }).populate('from').sort({ createdAt: -1 })
 
-    res.json(friendRequests)
+    // Use toPublicJSON to hide email from friend requests
+    const sanitizedRequests = friendRequests.map(request => ({
+      ...request.toObject(),
+      from: request.from.toPublicJSON()
+    }))
+
+    res.json(sanitizedRequests)
 
   } catch (error) {
     console.error('Get friend requests error:', error)
@@ -152,13 +158,12 @@ router.get('/', authenticate, async (req, res) => {
       users: userId
     }).populate({
       path: 'users',
-      select: '-password',
       match: { _id: { $ne: userId } }
     })
 
     const friends = friendships.map(friendship => {
       const friend = friendship.users.find(user => user._id.toString() !== userId.toString())
-      return friend
+      return friend ? friend.toPublicJSON() : null
     }).filter(Boolean)
 
     res.json(friends)

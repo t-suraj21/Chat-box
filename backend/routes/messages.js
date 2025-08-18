@@ -81,7 +81,14 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
     await message.save()
     await message.populate(['from', 'to'])
 
-    res.status(201).json(message)
+    // Sanitize response to hide emails
+    const sanitizedMessage = {
+      ...message.toObject(),
+      from: message.from.toPublicJSON(),
+      to: message.to.toPublicJSON()
+    }
+
+    res.status(201).json(sanitizedMessage)
 
   } catch (error) {
     console.error('File upload error:', error)
@@ -125,7 +132,14 @@ router.post('/', authenticate, async (req, res) => {
     await message.save()
     await message.populate(['from', 'to', 'replyTo'])
 
-    res.status(201).json(message)
+    // Sanitize response to hide emails
+    const sanitizedMessage = {
+      ...message.toObject(),
+      from: message.from.toPublicJSON(),
+      to: message.to.toPublicJSON()
+    }
+
+    res.status(201).json(sanitizedMessage)
 
   } catch (error) {
     console.error('Send message error:', error)
@@ -178,7 +192,14 @@ router.get('/:friendId', authenticate, async (req, res) => {
       }
     )
 
-    res.json(reversedMessages)
+    // Sanitize messages to hide emails from other users
+    const sanitizedMessages = reversedMessages.map(message => ({
+      ...message.toObject(),
+      from: message.from._id.toString() === userId.toString() ? message.from.toJSON() : message.from.toPublicJSON(),
+      to: message.to._id.toString() === userId.toString() ? message.to.toJSON() : message.to.toPublicJSON()
+    }))
+
+    res.json(sanitizedMessages)
 
   } catch (error) {
     console.error('Get messages error:', error)
@@ -220,7 +241,14 @@ router.put('/:messageId', authenticate, async (req, res) => {
     await message.save()
     await message.populate(['from', 'to'])
 
-    res.json(message)
+    // Sanitize response to hide emails
+    const sanitizedMessage = {
+      ...message.toObject(),
+      from: message.from.toPublicJSON(),
+      to: message.to.toPublicJSON()
+    }
+
+    res.json(sanitizedMessage)
 
   } catch (error) {
     console.error('Edit message error:', error)
@@ -270,6 +298,35 @@ router.get('/unread/count', authenticate, async (req, res) => {
   }
 })
 
+// Get recent messages for profile page
+router.get('/recent/profile', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id
+    const { limit = 10 } = req.query
+
+    // Get recent messages sent to the user (from other users)
+    const recentMessages = await Message.find({
+      to: userId
+    })
+    .populate(['from', 'to'])
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+
+    // Sanitize messages to use public profiles (hide emails)
+    const sanitizedMessages = recentMessages.map(message => ({
+      ...message.toObject(),
+      from: message.from.toPublicJSON(),
+      to: message.to.toJSON() // User's own profile, so can show full info
+    }))
+
+    res.json(sanitizedMessages)
+
+  } catch (error) {
+    console.error('Get recent messages error:', error)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
 // Add or remove reaction to a message
 router.post('/:messageId/reaction', authenticate, async (req, res) => {
   try {
@@ -312,7 +369,14 @@ router.post('/:messageId/reaction', authenticate, async (req, res) => {
     await message.save()
     await message.populate(['from', 'to', 'replyTo', 'reactions.user'])
 
-    res.json(message)
+    // Sanitize response to hide emails
+    const sanitizedMessage = {
+      ...message.toObject(),
+      from: message.from.toPublicJSON(),
+      to: message.to.toPublicJSON()
+    }
+
+    res.json(sanitizedMessage)
 
   } catch (error) {
     console.error('Add reaction error:', error)
