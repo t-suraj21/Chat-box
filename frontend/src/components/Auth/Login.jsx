@@ -41,7 +41,8 @@ const Login = () => {
       const response = await axios.post('https://chat-box-o6vn.onrender.com/api/auth/login', formData)
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user', JSON.stringify(response.data.user))
-      navigate('/dashboard')
+      // Reload the page to trigger auth check in App.jsx
+      window.location.href = '/dashboard'
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed')
     } finally {

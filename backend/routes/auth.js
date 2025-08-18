@@ -6,7 +6,7 @@ import { authenticate } from '../middleware/auth.js'
 const router = express.Router()
 
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '30d' })
+  return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '90d' })
 }
 
 router.post('/register', async (req, res) => {

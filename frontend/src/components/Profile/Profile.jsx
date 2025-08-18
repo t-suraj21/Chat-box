@@ -18,6 +18,9 @@ const Profile = () => {
   const [deletePassword, setDeletePassword] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [friends, setFriends] = useState([])
+  const [stats, setStats] = useState({ friends: 0, messages: 0 })
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -38,7 +41,30 @@ const Profile = () => {
       avatar: parsedUser.avatar || ''
     })
     setPreviewAvatar(parsedUser.avatar || '')
+    
+    // Fetch additional profile data
+    fetchProfileData()
   }, [navigate])
+
+  const fetchProfileData = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      
+      // Fetch friends
+      const friendsResponse = await axios.get('https://chat-box-o6vn.onrender.com/api/friends', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setFriends(friendsResponse.data.slice(0, 6)) // Show only first 6 friends
+      
+      // Set stats
+      setStats({
+        friends: friendsResponse.data.length,
+        messages: Math.floor(Math.random() * 1000) + 50 // Placeholder for message count
+      })
+    } catch (err) {
+      console.error('Failed to fetch profile data:', err)
+    }
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -97,6 +123,7 @@ const Profile = () => {
       localStorage.setItem('user', JSON.stringify(response.data.user))
       setUser(response.data.user)
       setSuccess('Profile updated successfully!')
+      setIsEditing(false)
     } catch (err) {
       setError(err.response?.data?.message || 'Profile update failed')
     } finally {
@@ -104,10 +131,23 @@ const Profile = () => {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    navigate('/login')
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (token) {
+        // Call logout endpoint to update user status
+        await axios.post('https://chat-box-o6vn.onrender.com/api/auth/logout', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      }
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      // Always clear local storage and redirect
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      window.location.href = '/login'
+    }
   }
 
   const handleDeleteAccount = async () => {
@@ -168,68 +208,148 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-6 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-6 border border-white/20">
-          <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
+              <h1 className="text-xl font-semibold">{user.username}</h1>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              >
+                {isEditing ? 'Cancel' : 'Edit Profile'}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Profile Header - Instagram Style */}
+        <div className="bg-white rounded-xl shadow-sm p-8 mb-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center space-y-6 md:space-y-0 md:space-x-8">
+            {/* Profile Picture */}
+            <div className="flex-shrink-0">
               <div className="relative">
                 {previewAvatar ? (
                   <img
                     src={previewAvatar}
                     alt="Profile"
-                    className="w-20 h-20 rounded-full object-cover border-4 border-blue-200"
+                    className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-gray-200"
                     onError={() => setPreviewAvatar('')}
                   />
                 ) : (
-                  <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-blue-200">
-                    <span className="text-white font-bold text-2xl">
+                  <div className="w-32 h-32 md:w-40 md:h-40 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center border-4 border-gray-200">
+                    <span className="text-white font-bold text-4xl md:text-5xl">
                       {user.username.charAt(0).toUpperCase()}
                     </span>
                   </div>
                 )}
-                <div className="absolute -bottom-1 -right-1 bg-green-400 w-6 h-6 rounded-full border-4 border-white"></div>
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{user.username}</h1>
-                <p className="text-gray-600">{user.email}</p>
-                {user.bio && <p className="text-gray-500 text-sm mt-1">{user.bio}</p>}
+                <div className="absolute -bottom-2 -right-2 bg-green-400 w-8 h-8 rounded-full border-4 border-white"></div>
               </div>
             </div>
-            
-            <div className="flex space-x-3">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-blue-300"
-              >
-                <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v4H8V5z" />
-                </svg>
-                Dashboard
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-red-300"
-              >
-                <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Logout
-              </button>
+
+            {/* Profile Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-6 space-y-4 sm:space-y-0 mb-4">
+                <h1 className="text-2xl md:text-3xl font-light">{user.username}</h1>
+                
+                {/* Stats */}
+                <div className="flex space-x-6 text-sm">
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">{stats.friends}</div>
+                    <div className="text-gray-500">friends</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">{stats.messages}</div>
+                    <div className="text-gray-500">messages</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bio */}
+              <div className="mb-4">
+                <div className="text-gray-600 font-medium mb-1">{user.username}</div>
+                {user.bio && (
+                  <div className="text-gray-800 whitespace-pre-wrap">{user.bio}</div>
+                )}
+              </div>
+
+              {/* Email (only visible to user) */}
+              <div className="text-sm text-gray-500">{user.email}</div>
             </div>
           </div>
         </div>
 
-        {/* Profile Form */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-white/20">
-          <div className="flex items-center mb-6">
-            <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            <h2 className="text-xl font-bold text-gray-900">Edit Profile</h2>
+        {/* Friends Section */}
+        {friends.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Friends</h2>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="text-blue-500 hover:text-blue-600 text-sm font-medium"
+              >
+                See all
+              </button>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+              {friends.map((friend) => (
+                <div key={friend._id} className="text-center">
+                  <div className="relative mb-2">
+                    {friend.avatar ? (
+                      <img
+                        src={friend.avatar}
+                        alt={friend.username}
+                        className="w-16 h-16 rounded-full object-cover mx-auto border-2 border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gradient-to-r from-gray-400 to-gray-600 rounded-full flex items-center justify-center mx-auto border-2 border-gray-200">
+                        <span className="text-white font-semibold text-lg">
+                          {friend.username.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    {friend.isOnline && (
+                      <div className="absolute -bottom-1 -right-1 bg-green-400 w-4 h-4 rounded-full border-2 border-white"></div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 truncate">{friend.username}</p>
+                </div>
+              ))}
+            </div>
           </div>
+        )}
+
+        {/* Edit Profile Form */}
+        {isEditing && (
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <div className="flex items-center mb-6">
+              <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <h2 className="text-xl font-bold text-gray-900">Edit Profile</h2>
+            </div>
 
           {success && (
             <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-md mb-6 animate-pulse">
@@ -343,7 +463,7 @@ const Profile = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-purple-700 focus:ring-4 focus:ring-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
+                className="flex-1 bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <div className="flex items-center justify-center">
@@ -354,7 +474,7 @@ const Profile = () => {
                     Updating...
                   </div>
                 ) : (
-                  'Update Profile'
+                  'Save Changes'
                 )}
               </button>
               
@@ -370,17 +490,19 @@ const Profile = () => {
                   setPreviewAvatar(user.avatar || '')
                   setError('')
                   setSuccess('')
+                  setIsEditing(false)
                 }}
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all duration-200 transform hover:scale-105 active:scale-95"
+                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
               >
-                Reset
+                Cancel
               </button>
             </div>
           </form>
-        </div>
+          </div>
+        )}
 
         {/* Delete Account Section */}
-        <div className="bg-red-50/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-red-200/20">
+        <div className="bg-red-50 rounded-xl shadow-sm p-6 border border-red-200">
           <div className="flex items-center mb-4">
             <svg className="w-6 h-6 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -388,7 +510,7 @@ const Profile = () => {
             <h2 className="text-xl font-bold text-red-800">Danger Zone</h2>
           </div>
           
-          <div className="bg-white/70 rounded-lg p-4 border border-red-200">
+          <div className="bg-white rounded-lg p-4 border border-red-200">
             <h3 className="text-lg font-semibold text-red-700 mb-2">Delete Account</h3>
             <p className="text-red-600 text-sm mb-4">
               Permanently delete your account and all associated data. This action cannot be undone. 
@@ -396,7 +518,7 @@ const Profile = () => {
             </p>
             <button
               onClick={openDeleteDialog}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-red-300"
+              className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors focus:ring-2 focus:ring-red-300"
             >
               Delete My Account
             </button>

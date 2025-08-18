@@ -151,7 +151,6 @@ const UserSearch = ({ onRefreshRequests }) => {
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900 truncate">{user.username}</p>
-                <p className="text-sm text-gray-600 truncate">{user.email}</p>
                 {user.bio && (
                   <p className="text-sm text-gray-500 truncate mt-1">{user.bio}</p>
                 )}

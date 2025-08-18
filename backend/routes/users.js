@@ -60,7 +60,7 @@ router.get('/search', authenticate, async (req, res) => {
       )
 
       return {
-        ...user.toJSON(),
+        ...user.toPublicJSON(),
         isFriend: friendIds.has(userId),
         requestSent: !!sentRequest,
         requestReceived: !!receivedRequest
@@ -83,7 +83,12 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    res.json(user)
+    // Return public profile (without email) unless it's the user's own profile
+    if (req.params.id === req.user._id.toString()) {
+      res.json(user.toJSON())
+    } else {
+      res.json(user.toPublicJSON())
+    }
 
   } catch (error) {
     console.error('Get user error:', error)

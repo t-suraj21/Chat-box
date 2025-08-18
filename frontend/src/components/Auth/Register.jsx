@@ -53,7 +53,8 @@ const Register = () => {
       })
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user', JSON.stringify(response.data.user))
-      navigate('/profile')
+      // Reload the page to trigger auth check in App.jsx
+      window.location.href = '/dashboard'
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed')
     } finally {

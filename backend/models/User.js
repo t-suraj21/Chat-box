@@ -60,4 +60,12 @@ userSchema.methods.toJSON = function() {
   return user
 }
 
+// Method to return public profile (without email for other users)
+userSchema.methods.toPublicJSON = function() {
+  const user = this.toObject()
+  delete user.password
+  delete user.email
+  return user
+}
+
 export default mongoose.model('User', userSchema)
